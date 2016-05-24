@@ -8,7 +8,7 @@ use XML::Simple;
 use Pod::Usage;
 use Data::Dumper;
 use FindBin qw($RealBin);
-use lib "$RealBin/lib";
+use lib "$RealBin/lib/dapPerlGenomicLib";
 use SortCoordinates;
 
 my @genes;
