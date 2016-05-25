@@ -236,6 +236,8 @@ This program outputs exon coordinates in BED format for given genes. The genome 
 
         getExonsFromUcsc.pl -g ABCD1 -b mm9 > mouse_ABCD1_exons.bed
         
+        getExonsFromUcsc.pl -g ABCD1 ABCD2 > ABCD1_and_ABCD2_exons.bed
+
         getExonsFromUcsc.pl -g COL13A1 -c > COL13A1_coding_exons.bed
         
         getExonsFromUcsc.pl -g COL13A1 -c -m > COL13A1_coding_exons_merged.bed

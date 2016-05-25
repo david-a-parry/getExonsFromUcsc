@@ -33,6 +33,24 @@ or
 The latter gives slightly more information and allows you to browse the 
 documentation via a pager (press 'q' to exit).
 
+Below are further examples of how you might want to use this script:
+
+    getExonsFromUcsc.pl -g ABCD1 > ABCD1_exons.bed
+    
+    getExonsFromUcsc.pl -g ABCD1 -f 100 > ABCD1_exons_plus100.bed
+
+    getExonsFromUcsc.pl -g ABCD1 -b mm9 > mouse_ABCD1_exons.bed
+
+    getExonsFromUcsc.pl -g ABCD1 ABCD2 > ABCD1_and_ABCD2_exons.bed
+    
+    getExonsFromUcsc.pl -g COL13A1 -c > COL13A1_coding_exons.bed
+    
+    getExonsFromUcsc.pl -g COL13A1 -c -m > COL13A1_coding_exons_merged.bed
+    
+    getExonsFromUcsc.pl -g COL13A1 -c -m -k > COL13A1_coding_exons_merged_with_info.bed
+
+
+
 ### AUTHOR
 
 David A. Parry
