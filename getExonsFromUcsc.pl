@@ -11,11 +11,17 @@ use lib "$RealBin/lib/dapPerlGenomicLib";
 use SortCoordinates;
 
 my @genes;
-my %opts = (genes => \@genes);
+my %opts = 
+(
+    genes => \@genes,
+    build => "hg19",
+);
+
 GetOptions
 (
     \%opts,
     "genes|g=s{,}",
+    "build|b=s",
     "flanks|f=i",
     "coding|c",
     "merge|m",
@@ -36,7 +42,7 @@ $opts{flanks} = 0 if not defined $opts{flanks}; #default flanks value
 #CONNECT AND EXECUTE QUERY
 my $dbh = DBI->connect_cached
 (
-    "dbi:mysql:hg19:genome-mysql.cse.ucsc.edu", 
+    "dbi:mysql:$opts{build}:genome-mysql.cse.ucsc.edu", 
     "genome", 
     ''
 );
@@ -46,7 +52,7 @@ my @all_exons = ();#bed line for each exon and flanks
 
 my $command = 
 "SELECT name, chrom, cdsStart, cdsEnd, exonStarts, exonEnds, strand, name2 ".
-"FROM hg19.refGene WHERE name2=?";  
+"FROM $opts{build}.refGene WHERE name2=?";  
 my $sth = $dbh->prepare($command);
 foreach my $gene (@genes){
     $sth->execute($gene);
@@ -165,13 +171,13 @@ foreach my $exon (@output_exons){
 
 =head1 NAME
 
-get_exons_from_ucsc.pl - get RefSeq exons for a given gene symbol from UCSC
+getExonsFromUcsc.pl - get RefSeq exons for a given gene symbol from UCSC
 
 =head1 SYNOPSIS
 
-        get_exons_from_ucsc.pl -g [gene symbol]  [options]
-        get_exons_from_ucsc.pl -h (display help message)
-        get_exons_from_ucsc.pl -m (display manual page)
+        getExonsFromUcsc.pl -g [gene symbol]  [options]
+        getExonsFromUcsc.pl -h (display help message)
+        getExonsFromUcsc.pl -m (display manual page)
 
 
 =cut
@@ -183,6 +189,10 @@ get_exons_from_ucsc.pl - get RefSeq exons for a given gene symbol from UCSC
 =item B<-g    --genes>
 
 Gene symbol to search for.
+
+=item B<-b    --build>
+
+Genome build/version to use. Default = hg19.
 
 =item B<-f    --flanks>
 
@@ -216,7 +226,21 @@ Show manual page.
 
 =head1 DESCRIPTION
 
-TO DO 
+This program outputs exon coordinates in BED format for given genes. The genome version defaults to hg19, but can be changed via the -b/--build option.
+
+=head1 EXAMPLES
+
+        getExonsFromUcsc.pl -g ABCD1 > ABCD1_exons.bed
+        
+        getExonsFromUcsc.pl -g ABCD1 -f 100 > ABCD1_exons_plus100.bed
+
+        getExonsFromUcsc.pl -g ABCD1 -b mm9 > mouse_ABCD1_exons.bed
+        
+        getExonsFromUcsc.pl -g COL13A1 -c > COL13A1_coding_exons.bed
+        
+        getExonsFromUcsc.pl -g COL13A1 -c -m > COL13A1_coding_exons_merged.bed
+        
+        getExonsFromUcsc.pl -g COL13A1 -c -m -k > COL13A1_coding_exons_merged_with_info.bed
 
 
 
@@ -226,7 +250,7 @@ TO DO
 
 David A. Parry
 
-University of Leeds
+University of Edinburgh
 
 =head1 COPYRIGHT AND LICENSE
 
