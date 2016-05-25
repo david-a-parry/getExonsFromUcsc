@@ -4,7 +4,6 @@ use warnings;
 use Getopt::Long;
 use DBI;
 use LWP::Simple;
-use XML::Simple; 
 use Pod::Usage;
 use Data::Dumper;
 use FindBin qw($RealBin);
