@@ -26,6 +26,7 @@ GetOptions
     "coding|c",
     "merge|m",
     "keep_info|k",
+    "w|whole_gene",
     "help|h",
     "manual",
 ) or pod2usage(-exitval => 2, -message => "Syntax error");
@@ -46,128 +47,179 @@ my $dbh = DBI->connect_cached
     "genome", 
     ''
 );
-
-my @cds_exons = ();#bed line for each cds region
-my @all_exons = ();#bed line for each exon and flanks
-
-my $command = 
-"SELECT name, chrom, cdsStart, cdsEnd, exonStarts, exonEnds, strand, name2 ".
-"FROM $opts{build}.refGene WHERE name2=?";  
-my $sth = $dbh->prepare($command);
-foreach my $gene (@genes){
-    $sth->execute($gene);
-
-    #PARSE RESULTS INTO EXON + FLANK REGIONS AND CDS REGIONS
-    while (my  @row = $sth->fetchrow_array ) {
-        my @starts = split(",", $row[4]);
-        my @ends = split(",", $row[5]);
-        #foreach exon check if coding and if so put in @cds_exons
-        #add a region of exon + $opts{flanks} to each end to @all_exons
-        for (my $i = 0; $i < @starts; $i++){
-            my $ex;
-            if ($row[6] eq '-'){
-                $ex = scalar(@starts) - $i ;
-            }else{
-                $ex = $i + 1;
-            }
-            if ($starts[$i] >= $row[2] && $starts[$i] <= $row[3]){#after cds start and before cds end
-                if ($ends[$i] < $row[3]){#end is before cds end
-                    push @cds_exons, join
-                    (
-                        "\t", 
-                        (
-                            $row[1], 
-                            $starts[$i]- $opts{flanks}, 
-                            $ends[$i]+ $opts{flanks},
-                            "$gene|$row[0]_ex$ex",
-                            0,
-                            $row[6],
-                        )
-                             
-                    );
-                }else{#cds end in same exon
-                    push @cds_exons, join
-                    (
-                        "\t", 
-                        (
-                            $row[1], 
-                            $starts[$i]- $opts{flanks}, 
-                            $row[3]+ $opts{flanks},
-                            "$gene|$row[0]_ex$ex",
-                            0,
-                            $row[6],
-                        )
-                    );
-                }
-            }elsif($starts[$i] < $row[2] and $row[2] < $ends[$i]){#cds start in middle of exon
-                if ($ends[$i] < $row[3]){#end is before cds end
-                    push @cds_exons, join
-                    (
-                        "\t", 
-                        (
-                            $row[1], 
-                            $row[2]- $opts{flanks}, 
-                            $ends[$i]+ $opts{flanks},
-                            "$gene|$row[0]_ex$ex",
-                            0,
-                            $row[6],
-                        )
-                    );
-                }else{#cds end in same exon
-                    push @cds_exons, join
-                    (
-                        "\t", 
-                        (
-                            $row[1], 
-                            $row[2]- $opts{flanks}, 
-                            $row[3]+ $opts{flanks},
-                            "$gene|$row[0]_ex$ex",
-                            0,
-                            $row[6],
-                        )
-                    );
-                }
-            }
-                
-
-            push @all_exons, join
-            (
-                "\t", 
-                (
-                    $row[1], 
-                    $starts[$i] - $opts{flanks}, 
-                    $ends[$i] + $opts{flanks},
-                    "$gene|$row[0]_ex$ex",
-                    0,
-                    $row[6],
-                )
-            );
-        }
-    }
-}
-
-my @output_exons = ();
-if ($opts{coding}){
-    @output_exons = @cds_exons;
+my @regions = ();
+if ($opts{w}){
+    @regions = get_gene()
 }else{
-    @output_exons = @all_exons;
+    @regions = get_exons();
 }
 
 #SORT AND MERGE OUR EXONS+FLANKS ARRAY
-@output_exons = SortCoordinates::sortByCoordinate(array => \@output_exons);
+@regions = SortCoordinates::sortByCoordinate(array => \@regions);
 if ($opts{merge}){
-    @output_exons = SortCoordinates::mergeByCoordinate
+    @regions = SortCoordinates::mergeByCoordinate
     (
-        array     => \@output_exons,
+        array     => \@regions,
         keep_info => $opts{keep_info},
     );
 }
 
-foreach my $exon (@output_exons){
+foreach my $exon (@regions){
     print "$exon\n";   
 }
 
+#################################################
+sub get_gene{
+    my @tx_regions = ();
+    my @cds_regions = ();
+    my $command = 
+    "SELECT name, chrom, txStart, txEnd, cdsStart, cdsEnd, strand, name2"
+    ." FROM $opts{build}.refGene WHERE name2=?";
+    my $sth = $dbh->prepare($command);
+    foreach my $gene (@genes){
+        $sth->execute($gene);
+        #PARSE RESULTS INTO EXON + FLANK REGIONS AND CDS REGIONS
+        while (my  @row = $sth->fetchrow_array ) {
+            push @cds_regions, join
+            (
+                "\t", 
+                (
+                    $row[1], 
+                    $row[4] - $opts{flanks}, 
+                    $row[5] + $opts{flanks},
+                    "$gene|$row[0]",
+                    0,
+                    $row[6],
+                )
+            );
+            push @tx_regions, join
+            (
+                "\t", 
+                (
+                    $row[1], 
+                    $row[2] - $opts{flanks}, 
+                    $row[3] + $opts{flanks},
+                    "$gene|$row[0]",
+                    0,
+                    $row[6],
+                )
+            );
+            
+        }
+    }
+    if ($opts{coding}){
+        return @cds_regions;
+    }else{
+        return @tx_regions;
+    }
+}
 
+#################################################
+sub get_exons{
+    my @cds_exons = ();#bed line for each cds region
+    my @all_exons = ();#bed line for each exon and flanks
+    my $command = 
+    "SELECT name, chrom, cdsStart, cdsEnd, exonStarts, exonEnds, strand, name2"
+    ." FROM $opts{build}.refGene WHERE name2=?";  
+    my $sth = $dbh->prepare($command);
+    foreach my $gene (@genes){
+        $sth->execute($gene);
+        #PARSE RESULTS INTO EXON + FLANK REGIONS AND CDS REGIONS
+        while (my  @row = $sth->fetchrow_array ) {
+            my @starts = split(",", $row[4]);
+            my @ends = split(",", $row[5]);
+            #foreach exon check if coding and if so put in @cds_exons
+            #add a region of exon + $opts{flanks} to each end to @all_exons
+            for (my $i = 0; $i < @starts; $i++){
+                my $ex;
+                if ($row[6] eq '-'){
+                    $ex = scalar(@starts) - $i ;
+                }else{
+                    $ex = $i + 1;
+                }
+                if ($starts[$i] >= $row[2] && $starts[$i] <= $row[3]){#after cds start and before cds end
+                    if ($ends[$i] < $row[3]){#end is before cds end
+                        push @cds_exons, join
+                        (
+                            "\t", 
+                            (
+                                $row[1], 
+                                $starts[$i]- $opts{flanks}, 
+                                $ends[$i]+ $opts{flanks},
+                                "$gene|$row[0]_ex$ex",
+                                0,
+                                $row[6],
+                            )
+                                 
+                        );
+                    }else{#cds end in same exon
+                        push @cds_exons, join
+                        (
+                            "\t", 
+                            (
+                                $row[1], 
+                                $starts[$i]- $opts{flanks}, 
+                                $row[3]+ $opts{flanks},
+                                "$gene|$row[0]_ex$ex",
+                                0,
+                                $row[6],
+                            )
+                        );
+                    }
+                }elsif($starts[$i] < $row[2] and $row[2] < $ends[$i]){#cds start in middle of exon
+                    if ($ends[$i] < $row[3]){#end is before cds end
+                        push @cds_exons, join
+                        (
+                            "\t", 
+                            (
+                                $row[1], 
+                                $row[2]- $opts{flanks}, 
+                                $ends[$i]+ $opts{flanks},
+                                "$gene|$row[0]_ex$ex",
+                                0,
+                                $row[6],
+                            )
+                        );
+                    }else{#cds end in same exon
+                        push @cds_exons, join
+                        (
+                            "\t", 
+                            (
+                                $row[1], 
+                                $row[2]- $opts{flanks}, 
+                                $row[3]+ $opts{flanks},
+                                "$gene|$row[0]_ex$ex",
+                                0,
+                                $row[6],
+                            )
+                        );
+                    }
+                }
+                    
+
+                push @all_exons, join
+                (
+                    "\t", 
+                    (
+                        $row[1], 
+                        $starts[$i] - $opts{flanks}, 
+                        $ends[$i] + $opts{flanks},
+                        "$gene|$row[0]_ex$ex",
+                        0,
+                        $row[6],
+                    )
+                );
+            }
+        }
+    }
+    if ($opts{coding}){
+        return @cds_exons;
+    }else{
+        return @all_exons;
+    }
+}
+
+#################################################
 
 =head1 NAME
 
@@ -204,11 +256,17 @@ Merge overlapping exons into single regions.
 
 =item B<-k    --keep_info>
 
-When merging overlapping exons, use this option to print a column of details from each merged region.
+When merging overlapping exons, use this option to print a column of details 
+from each merged region.
 
 =item B<-c    --coding>
 
 Only output coding regions. 
+
+=item B<-w    --whole_gene>
+
+Output transcription start and stop coordinates only for each gene, or if 
+--coding option is used, the CDS start and end coordinates.
 
 =item B<-h    --help>
 
@@ -226,7 +284,8 @@ Show manual page.
 
 =head1 DESCRIPTION
 
-This program outputs exon coordinates in BED format for given genes. The genome version defaults to hg19, but can be changed via the -b/--build option.
+This program outputs exon coordinates in BED format for given genes. The genome
+version defaults to hg19, but can be changed via the -b/--build option.
 
 =head1 EXAMPLES
 
