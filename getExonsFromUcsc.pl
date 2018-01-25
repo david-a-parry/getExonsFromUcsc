@@ -27,6 +27,7 @@ GetOptions
     "merge|m",
     "keep_info|k",
     "w|whole_gene",
+    "s|standard_chr_only",
     "help|h",
     "manual",
 ) or pod2usage(-exitval => 2, -message => "Syntax error");
@@ -65,6 +66,9 @@ if ($opts{merge}){
 }
 
 foreach my $exon (@regions){
+    if ($opts{s}){ #skip haplotype chromosomes
+        next if $exon =~ /^(chr)?[0-9XYMT]+_/ or $exon =~ /^(chr)?Un_/;
+    }
     print "$exon\n";   
 }
 
@@ -267,6 +271,10 @@ Only output coding regions.
 
 Output transcription start and stop coordinates only for each gene, or if 
 --coding option is used, the CDS start and end coordinates.
+
+=item B<-s    --standard_chr_only>
+
+Do not output regions on haplotype or unplaced contigs.
 
 =item B<-h    --help>
 
