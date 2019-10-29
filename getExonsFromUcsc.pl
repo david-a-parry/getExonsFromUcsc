@@ -28,6 +28,7 @@ GetOptions
     "keep_info|k",
     "w|whole_gene",
     "s|standard_chr_only",
+    "failures=s",
     "help|h",
     "manual",
 ) or pod2usage(-exitval => 2, -message => "Syntax error");
@@ -40,6 +41,11 @@ pod2usage
 ) if not @genes;
 
 $opts{flanks} = 0 if not defined $opts{flanks}; #default flanks value
+my $FAILS_FH = undef;
+if ($opts{failures}){
+    open ($FAILS_FH, ">", $opts{failures}) or die "Could not create ".
+            "$opts{failures} file: $!\n";
+}
 
 #CONNECT AND EXECUTE QUERY
 my $dbh = DBI->connect_cached
@@ -72,6 +78,10 @@ foreach my $exon (@regions){
     print "$exon\n";   
 }
 
+if ($FAILS_FH){
+    close $FAILS_FH;
+}
+
 #################################################
 sub get_gene{
     my @tx_regions = ();
@@ -81,9 +91,11 @@ sub get_gene{
     ." FROM $opts{build}.refGene WHERE name2=?";
     my $sth = $dbh->prepare($command);
     foreach my $gene (@genes){
+        my $found = 0;
         $sth->execute($gene);
         #PARSE RESULTS INTO EXON + FLANK REGIONS AND CDS REGIONS
         while (my  @row = $sth->fetchrow_array ) {
+            $found++;
             push @cds_regions, join
             (
                 "\t", 
@@ -110,6 +122,12 @@ sub get_gene{
             );
             
         }
+        if (not $found){
+            warn "No results for '$gene'\n";
+            if ($FAILS_FH){
+                print $FAILS_FH "$gene\n";
+            }
+        }
     }
     if ($opts{coding}){
         return @cds_regions;
@@ -127,9 +145,11 @@ sub get_exons{
     ." FROM $opts{build}.refGene WHERE name2=?";  
     my $sth = $dbh->prepare($command);
     foreach my $gene (@genes){
+        my $found = 0;
         $sth->execute($gene);
         #PARSE RESULTS INTO EXON + FLANK REGIONS AND CDS REGIONS
         while (my  @row = $sth->fetchrow_array ) {
+            $found++;
             my @starts = split(",", $row[4]);
             my @ends = split(",", $row[5]);
             #foreach exon check if coding and if so put in @cds_exons
@@ -213,6 +233,12 @@ sub get_exons{
                         $row[6],
                     )
                 );
+            }
+        }
+        if (not $found){
+            warn "No results for '$gene'\n";
+            if ($FAILS_FH){
+                print $FAILS_FH "$gene\n";
             }
         }
     }
