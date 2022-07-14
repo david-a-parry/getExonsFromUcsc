@@ -38,7 +38,7 @@ pod2usage (-verbose => 1) if $opts{help};
 pod2usage
 (
     -exitval => 2, 
-    -message => "--genes argument required - for help use --help"
+    -message => "--genes or --list argument required - for help use --help"
 ) if not $opts{l} and not @genes;
 
 if ($opts{l}){
@@ -283,6 +283,10 @@ getExonsFromUcsc.pl - get RefSeq exons for a given gene symbol from UCSC
 
 Gene symbol to search for.
 
+=item B<-l    --list>
+
+A list of gene symbols or IDs to use instead of or in conjunction with -g/--genes. 
+
 =item B<-b    --build>
 
 Genome build/version to use. Default = hg19.
@@ -312,6 +316,10 @@ Output transcription start and stop coordinates only for each gene, or if
 =item B<-s    --standard_chr_only>
 
 Do not output regions on haplotype or unplaced contigs.
+
+=item B<--failures>
+
+Output unrecognised gene IDs to this file.
 
 =item B<-h    --help>
 
