@@ -21,6 +21,7 @@ GetOptions
 (
     \%opts,
     "genes|g=s{,}",
+    'l|list=s',
     "build|b=s",
     "flanks|f=i",
     "coding|c",
@@ -38,8 +39,18 @@ pod2usage
 (
     -exitval => 2, 
     -message => "--genes argument required - for help use --help"
-) if not @genes;
+) if not $opts{l} and not @genes;
 
+if ($opts{l}){
+    open (my $GENES, $opts{l}) or die "Could not open --gene_list '$opts{l}' for reading: $!\n";
+    while (my $line = <$GENES>){
+        my @s = split(/\s+/, $line); 
+        push @genes, $s[0];
+    }
+}
+if (not @genes){
+    die "No gene IDs identified!\n";
+}
 $opts{flanks} = 0 if not defined $opts{flanks}; #default flanks value
 my $FAILS_FH = undef;
 if ($opts{failures}){
